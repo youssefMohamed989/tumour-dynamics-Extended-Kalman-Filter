@@ -1,306 +1,383 @@
-# SiNP-Chitosan Nanoplasmonic Lab-on-a-Chip for Whole-Blood GPC3 Detection
+# tumour-dynamics-Extended-Kalman-Filter
 
-A self-powered, 3D-printed microfluidic biosensor that performs passive plasma separation and quantitative glypican-3 (GPC3) detection directly from unprocessed finger-prick whole blood, without centrifugation, pipettes, cold-chain reagents, or any laboratory instrument.
-
----
-
-## Overview
-
-This repository contains all custom code accompanying the manuscript:
-
-**"A SiNP-Chitosan Nanocomposite Converts Hydrophobic 3D-Printed Microchannels into Whole-Blood-Operable Nanoplasmonic Biosensors"**
-
-Youssef M. Hassan, Mohamed S. Attia, Hala El-Tantawi, Ibrahim Rabie Ali, Dalia M. El-Husseini, Mona N. Abou-Omar
-
-The platform integrates four functional modules in a single 45 x 18 x 6 mm SLA-printed cartridge:
-
-1. Geometry-programmed capillary transport driven by a SiNP-chitosan nanocomposite surface coating
-2. Micropillar-assisted passive plasma separation (35-42% recovery in 30 s)
-3. Anti-GPC3-functionalised AuNP nanoplasmonic biosensing (LOD = 0.24 ng/mL, LSPR channel)
-4. Dual-mode readout: LSPR ratiometry (A580/A520) for laboratory validation and instrument-free RGB colourimetry (TCS3200/Arduino) for point-of-care use
-
-Clinical validation was performed in a DEN-induced murine HCC model across weeks 9-16 (n = 10 HCC, n = 10 control). All performance metrics are preclinical; prospective human validation is planned.
+Gompertz tumour growth modelling and Extended Kalman Filter (EKF) state reconstruction of hepatocellular carcinoma burden from serial nanoplasmonic GPC3 biosensor measurements. Validated in a DEN-induced murine HCC model (n = 10/group, weeks 9–16). Includes non-Newtonian CFD, surface dynamics modelling, dual-mode LSPR/RGB calibration, and full biomarker statistics.
 
 ---
 
-## Repository Structure
+## Contents
 
 ```
 .
-|-- arduino/
-|   `-- rgb_sensor_readout/
-|       `-- rgb_sensor_readout.ino     # TCS3200 RGB sensor + Arduino Nano firmware
-|
-|-- matlab/
-|   |-- surface_dynamics/
-|   |   `-- surface_dynamics.m         # Surface property modelling (Ra, theta, Laplace pressure, fibrinogen)
-|   |-- cfd_validation/
-|   |   `-- carreau_yasuda_flow.m      # Non-Newtonian capillary flow model and CY vs Newtonian comparison
-|   |-- biosensor_calibration/
-|   |   `-- lspr_rgb_calibration.m    # LSPR ratiometric and RGB calibration curve fitting
-|   |-- tumour_dynamics/
-|   |   |-- gompertz_fit.m             # Gompertz tumour growth model fitting
-|   |   `-- ekf_tumour_reconstruction.m  # Extended Kalman Filter for tumour volume reconstruction from GPC3
-|   `-- statistics/
-|       `-- biomarker_statistics.m     # ROC analysis, Bland-Altman, Passing-Bablok, PCA
-|
-`-- README.md
+├── gompertz_growth_model.py       # Generalised Gompertz fitting class (Python)
+├── extended_kalman_filter.py      # Generic EKF + GompertzEKF pre-built model (Python)
+├── gompertz_fit.m                 # Gompertz fitting + bootstrap CIs (MATLAB)
+├── biomarker_statistics.m         # ROC, Bland-Altman, PCA, ANOVA, BH-FDR (MATLAB)
+├── carreau_yasuda_flow.m          # Non-Newtonian capillary CFD (MATLAB)
+├── lspr_rgb_calibration.m         # Dual-mode biosensor calibration curves (MATLAB)
+├── surface_dynamics.m             # Surface property modelling (MATLAB)
+└── rgb_sensor_readout.ino         # TCS3200 + Arduino Nano firmware (C++)
 ```
 
 ---
 
-## Hardware
+## Quick Start
 
-### Chip Fabrication
+### Python (recommended)
 
-- Printer: Formlabs Form 3, Clear V4 Resin
-- Layer height: 25 um
-- Post-cure: 405 nm UV, 60 degrees C, 30 min (FormCure)
-- Chip dimensions: 45 x 18 x 6 mm
-- Micropillar diameter: 50-100 um; inter-pillar gap: 150 um; height ~0.45 mm
-- Design software: Autodesk Fusion 360 (STL files available upon request from corresponding author)
-
-### Surface Coating (SiNP-Chitosan Nanocomposite)
-
-Sequential deposition:
-
-1. Stober-synthesised SiNPs (~142 nm): spin-coat at 2000 rpm for 60 s, anneal at 80 degrees C for 20 min
-2. TPP-crosslinked chitosan (2% w/v, 50-190 kDa, >=85% deacetylation, pH 5.5): spin-coat at 1500 rpm for 45 s, dry at 37 degrees C for 2 h
-
-Resulting surface properties:
-- Contact angle: 74.3 degrees (bare resin) to 25.3 degrees (nanocomposite)
-- Laplace pressure: 86 Pa to 451 Pa (5.2-fold amplification)
-- Fibrinogen adsorption: 3.8 ug/cm2 to 0.31 ug/cm2 (12-fold reduction)
-
-### AuNP Biosensor Assembly
-
-- AuNP synthesis: Frens-Turkevich method; citrate-stabilised; TEM core diameter 30.2 +/- 2.8 nm; zeta = -38.2 mV (pre-conjugation); PDI = 0.09
-- Antibody conjugation: EDC/Sulfo-NHS carbodiimide coupling; anti-GPC3 (Abcam ab56789, clone 1G12); 10 ug/mL in PBS pH 7.4; 30 min room temperature
-- Blocking: 1% BSA overnight; stored in PBS + 0.05% sodium azide at 4 degrees C
-- Post-conjugation characterisation: hydrodynamic diameter 45.2 +/- 3.1 nm (PDI 0.11); zeta = -26.4 +/- 1.8 mV
-- Stable for 45 days at 37 degrees C: A580/A520 drift <3%, DLS diameter change <4 nm
-
-### Readout Electronics
-
-- RGB channel (point-of-care): TCS3200 colour sensor + Arduino Nano
-- LSPR channel (laboratory validation): Jenway UV-1800 UV-Vis spectrophotometer; A580/A520 ratiometry
-- Arduino IDE version: 2.3.2
-
----
-
-## Software
-
-### Requirements
-
-#### MATLAB
-
-- MATLAB R2023b
-- Statistics and Machine Learning Toolbox
-- Optimization Toolbox
-- Signal Processing Toolbox (for EKF)
-
-#### Arduino
-
-- Arduino IDE 2.3.2
-- Board: Arduino Nano (ATmega328P)
-- No external libraries required beyond standard Arduino core
-
-#### Statistical Analysis (R)
-
-All statistical analyses reported in the manuscript were performed in R v4.3.1. The MATLAB scripts reproduce the key figures and models; for full statistical output including Benjamini-Hochberg FDR-corrected q-values, refer to Supplementary Table S-E18.
-
----
-
-## Module Descriptions
-
-### arduino/rgb_sensor_readout/rgb_sensor_readout.ino
-
-Firmware for the TCS3200 colour sensor module integrated into the chip detection chamber.
-
-Reads raw red, green, and blue channel photodiode counts from the TCS3200, applies a simple calibration offset, and outputs a formatted serial string at 9600 baud for data logging. The red channel intensity is the primary GPC3 quantification signal (calibration: y = -4.54x + 116.68; R2 = 0.994; LOD = 0.31 ng/mL).
-
-Wiring:
-- S0 -> D4, S1 -> D5 (frequency scaling, set to 20%)
-- S2 -> D6, S3 -> D7 (colour filter selection)
-- OUT -> D8 (frequency output)
-- OE -> GND (output enable, active low)
-
-Serial output format: `R:<value> G:<value> B:<value> GPC3_est:<value_ng_per_mL>`
-
-### matlab/surface_dynamics/surface_dynamics.m
-
-Reproduces Figure 4 of the manuscript. Computes and plots the progressive surface property changes across the three surface conditions (bare SLA resin, SiNP-only, SiNP-chitosan nanocomposite) using experimentally measured inputs:
-
-- Surface roughness Ra from profilometry
-- Contact angle theta from goniometry
-- Laplace capillary pressure from theta and channel geometry
-- Fibrinogen adsorption from QCM-D
-- Coating thickness from ellipsometry and cross-sectional SEM
-
-Inputs are defined as constants at the top of the script matching the values reported in Table 1 and Supporting Information Tables S-E7 through S-E9. Model fidelity R2 = 0.982 +/- 0.009 (n = 18) vs experimental profilometry.
-
-### matlab/cfd_validation/carreau_yasuda_flow.m
-
-Implements the Carreau-Yasuda non-Newtonian capillary flow model and compares it against the Newtonian assumption and experimental flow-front position data (n = 10 chips). Reproduces Figure 3.
-
-Carreau-Yasuda parameters used:
-- eta_0 = 0.056 Pa.s (zero-shear viscosity)
-- eta_inf = 0.0035 Pa.s (infinite-shear viscosity)
-- lambda = 3.313 s (relaxation time)
-- a = 2.0, n = 0.3568 (power-law index and transition parameter)
-
-Key results reproduced:
-- CY model: RMSE = 7.3%, R2 = 0.994 vs experiment
-- Newtonian model: RMSE = 23.1%, R2 = 0.871 vs experiment
-- Mean effective viscosity eta_eff = 8.9 mPa.s in the operating shear-rate window (20-50 s^-1)
-- Wall shear stress: mean 0.94 Pa, peak 1.83 Pa (below haemolysis threshold of ~4 Pa)
-- Theoretical flow rate: 6.4 uL/min (experimental: 6.1-6.8 uL/min)
-
-### matlab/biosensor_calibration/lspr_rgb_calibration.m
-
-Fits and plots calibration curves for both detection channels across 0.25-5 ng/mL recombinant GPC3:
-
-- LSPR channel: A580/A520 ratiometric signal; multi-day replicated (n = 21 blank replicates across 3 assay days); R2 = 0.997; slope = 0.183 AU per ng/mL; LOD = 0.24 ng/mL; LOQ = 0.80 ng/mL
-- RGB channel: TCS3200 red-channel intensity; R2 = 0.994; LOD = 0.31 ng/mL
-
-LOD is calculated as mean blank + 3 sigma (n = 21 blank replicates). LOQ is calculated as mean blank + 10 sigma. Both channels are plotted with 95% confidence bands. Inter-channel Pearson correlation is computed from the paired calibration data (r = 0.994 in the manuscript).
-
-### matlab/tumour_dynamics/gompertz_fit.m
-
-Fits a three-parameter Gompertz growth model to the longitudinal tumour volume data from the DEN-HCC murine cohort (weeks 9-16; n = 10 HCC animals):
-
-V(t) = A * exp(-B * exp(-C * t))
-
-Fitted parameters: A = 312.4 mm3, B = 4.82, C = 0.185 day^-1 (manuscript values; bootstrap 95% CIs in Supplementary Table S8). Goodness of fit: R2 = 0.988, MAPE = 6.3%. Compares against linear (R2 = 0.82) and exponential (R2 = 0.91) alternatives.
-
-Note: This model was fitted to the 10-animal HCC cohort. Independent prospective validation in a separate cohort is required before this constitutes a validated predictive tool.
-
-### matlab/tumour_dynamics/ekf_tumour_reconstruction.m
-
-Implements an Extended Kalman Filter (EKF) that reconstructs tumour volume trajectories from serial weekly GPC3 measurements alone, using the Gompertz state-transition equations as the process model.
-
-State vector: [tumour_volume; GPC3_concentration]
-Measurement: circulating GPC3 (on-chip LSPR)
-
-Performance (leave-one-out cross-validated on the 10-animal fitting cohort): R2 = 0.960 (95% CI: 0.931-0.981). This is an in-sample retrospective proof-of-concept result. Independent validation in a separate animal cohort is required before clinical application.
-
-### matlab/statistics/biomarker_statistics.m
-
-Reproduces the statistical analyses reported in Sections 3.6-3.7:
-
-- ROC analysis and AUC computation with DeLong method 95% CIs
-- Bland-Altman agreement analysis between on-chip and ELISA GPC3 measurements
-- Passing-Bablok regression (on-chip vs ELISA)
-- Intraclass correlation coefficient (ICC, two-way mixed, absolute agreement)
-- Principal component analysis (PCA) of the multi-biomarker panel (GPC3, AFP, ALT, AST, GGT)
-- One-way ANOVA with Tukey HSD post-hoc correction
-- Benjamini-Hochberg FDR correction for multi-timepoint comparisons
-
-Input data format: CSV files with columns [animal_id, group, week, GPC3_chip, GPC3_elisa, AFP, ALT, AST, GGT, tumour_volume]. Data are available from the corresponding author upon reasonable request.
-
----
-
-## Calibration
-
-### LSPR Channel
-
-Calibration standards: 0, 0.25, 0.5, 1, 2, 5 ng/mL recombinant murine GPC3 (R&D Systems cat. 4609-GP) prepared in normal mouse serum matrix. Run in triplicate on each assay day.
-
-```
-A580/A520 = 0.183 * [GPC3 ng/mL] + 0.312
-LOD = 0.24 ng/mL
-LOQ = 0.80 ng/mL
-Linear range: 0.25 - 5 ng/mL
+```bash
+pip install numpy scipy matplotlib
 ```
 
-### RGB Channel
+```python
+from gompertz_growth_model import fit_gompertz
+from extended_kalman_filter import GompertzEKF
 
-```
-Red_intensity = -4.54 * [GPC3 ng/mL] + 116.68
-LOD = 0.31 ng/mL
-Linear range: 0.25 - 5 ng/mL
+# 1. Fit Gompertz model to longitudinal volume data
+t_days = [63, 77, 91, 112]                      # days post-DEN
+V_mean = [32.1, 89.4, 178.2, 298.6]             # mm³ group mean
+V_sd   = [8.2,  18.3, 31.5,  47.2]              # mm³ SD  (n = 10)
+
+model = fit_gompertz(t_days, V_mean, y_sd=V_sd,
+                     n_boot=1000,
+                     time_unit="days",
+                     value_label="Tumour volume (mm³)")
+# → prints A, B, C with 95% CIs; saves 4-panel diagnostic figure
+
+# 2. Run EKF to reconstruct volume from serial GPC3 alone
+gpc3_obs = [1.18, 1.84, 2.92, 4.52]             # ng/mL (weekly chip readings)
+
+ekf = GompertzEKF(A=model.params[0],
+                  B=model.params[1],
+                  C=model.params[2],
+                  alpha=0.01,    # shedding rate  ng·mL⁻¹·mm⁻³·day⁻¹
+                  beta=0.04,     # clearance rate day⁻¹
+                  sigma_obs=0.20)
+
+results = ekf.run(gpc3_obs, t_days)
+print(results["V_est"])   # reconstructed tumour volumes
+ekf.plot(results, tumour_volume_true=V_mean)
 ```
 
-Both equations are from multi-day replicated calibration (R2 = 0.997 and 0.994 respectively). For single-run calibration the R2 will be lower due to run-to-run colloidal variance inherent in multivalent AuNP aggregation assays (representative single-run values shown in Figure 5D-E of the manuscript).
+### MATLAB
+
+```matlab
+% Requires: Optimization Toolbox, Statistics & ML Toolbox, Signal Processing Toolbox
+run('gompertz_fit.m')             % Gompertz fit + bootstrap
+run('biomarker_statistics.m')     % ROC / Bland-Altman / PCA
+run('carreau_yasuda_flow.m')      % CFD validation
+run('lspr_rgb_calibration.m')     % Calibration curves
+run('surface_dynamics.m')         % Surface property plots
+```
 
 ---
 
-## Assay Protocol (Brief)
+## Python Modules
 
-1. Load 5-8 uL whole blood (finger-prick or retro-orbital; heparin, EDTA, or citrate anticoagulated) at the chip inlet.
-2. Passive capillary flow drives plasma separation across the SiNP-chitosan micropillar array within 30 s. No user intervention required.
-3. Separated plasma contacts anti-GPC3-AuNP chitosan hydrogel beads in the detection zone.
-4. Incubate 10-12 min at room temperature.
-5. Read signal:
-   - Point-of-care: red channel intensity from TCS3200/Arduino; apply RGB calibration equation.
-   - Laboratory: measure A580 and A520 on benchtop UV-Vis; compute A580/A520 ratio; apply LSPR calibration equation.
-6. Total sample-to-answer time: under 15 min.
+### `gompertz_growth_model.py`
 
-Anticoagulant compatibility confirmed: heparin, EDTA, citrate (recovery >=95.8% for all). Haematocrit range validated: Hct 0.30-0.50 (no significant effect on GPC3 accuracy, ANOVA p = 0.22). Samples with spectrophotometric evidence of haemolysis (A414 > 0.05) should be excluded.
+Generalised three-parameter Gompertz model — no domain-specific hard-coding.
+
+**Model:**
+```
+y(t) = A · exp(−B · exp(−C · t))
+
+A  asymptotic (carrying-capacity) value
+B  dimensionless displacement  →  inflection at  t* = ln(B)/C,  y* = A/e
+C  intrinsic growth-rate constant  [1/time_unit]
+```
+
+**`GompertzModel` class — key methods:**
+
+| Method | Description |
+|---|---|
+| `.fit(t, y, y_sd=None)` | Nonlinear least-squares fit via `scipy.optimize.curve_fit`; weighted if `y_sd` provided |
+| `.bootstrap_ci(n_boot=1000)` | Residual-resampling bootstrap; returns `{'A':(lo,hi), 'B':…, 'C':…}` |
+| `.compare_alternatives()` | Fits linear and exponential alternatives; reports R² and MAPE |
+| `.predict(t_new)` | Returns `(y_mean, y_lower, y_upper)` with bootstrap uncertainty bands |
+| `.summary()` | Prints parameter table, inflection point, goodness-of-fit |
+| `.plot()` | Four-panel figure: fits + CI, residuals, bootstrap distributions for A and C |
+
+**Convenience wrapper:**
+```python
+model = fit_gompertz(t, y, y_sd=sd, n_boot=500,
+                     time_unit="hours", value_label="OD600")
+y_pred, lo, hi = model.predict(np.linspace(0, 30, 200))
+```
+
+**Application domains:**
+
+| Domain | `y(t)` | `t` | Typical `A` |
+|---|---|---|---|
+| Oncology | Tumour volume (mm³) | Days | 100–1000 mm³ |
+| Microbiology | OD600 / colony count | Hours | Max OD |
+| Ecology | Population size | Years | Carrying capacity |
+| Epidemiology | Cumulative cases | Days | Final plateau |
+| Battery aging | Capacity retention (%) | Cycles | ~80% |
+| Product adoption | Cumulative users | Months | TAM |
 
 ---
 
-## Performance Summary
+### `extended_kalman_filter.py`
 
-| Parameter | LSPR Channel | RGB Channel |
+Two-layer design: a **generic EKF** that accepts arbitrary `f` and `h` callables, and a **pre-built `GompertzEKF`** wired to the Gompertz process model.
+
+#### Generic `EKF` class
+
+```python
+from extended_kalman_filter import EKF
+
+ekf = EKF(
+    n_states = 2,
+    n_obs    = 1,
+    Q = np.diag([25.0, 0.01]),   # process noise covariance
+    R = np.array([[0.04]]),       # measurement noise covariance
+    f = my_process_fn,            # x_{k+1} = f(x_k)   [nonlinear]
+    h = my_obs_fn,                # z_k      = h(x_k)   [nonlinear]
+    # F_jac / H_jac: optional analytic Jacobians; numeric otherwise
+    clip_state = lambda x: np.maximum(x, 0)   # enforce constraints
+)
+
+ekf.init_state(x0=[30.0, 1.0], P0=np.diag([900.0, 1.0]))
+
+for z in measurements:
+    ekf.predict()
+    x_post, P_post, K, innov = ekf.update(z)
+
+xs_smooth, Ps_smooth = ekf.smooth()   # RTS backward pass
+```
+
+Jacobians are computed by **central-difference numerical differentiation** unless analytic versions are supplied — making the class applicable to any nonlinear system without symbolic math.
+
+#### State-space equations
+
+```
+Predict:
+    x̂⁻_k  =  f(x̂_{k-1})
+    P⁻_k   =  F_{k-1} P_{k-1} Fᵀ_{k-1} + Q
+
+Update:
+    K_k    =  P⁻_k Hᵀ_k (H_k P⁻_k Hᵀ_k + R)⁻¹
+    x̂_k    =  x̂⁻_k + K_k (z_k − h(x̂⁻_k))
+    P_k    =  (I − K_k H_k) P⁻_k
+
+where  F = ∂f/∂x,  H = ∂h/∂x  (Jacobians)
+```
+
+#### Pre-built `GompertzEKF`
+
+State vector `x = [V, c]`:
+
+```
+V_{k+1} = V_k + dt · V_k · C · ln(A / V_k)          (Gompertz ODE, Euler)
+c_{k+1} = c_k + dt · (α · max(V_k − V_thresh, 0) − β · c_k)
+
+z_k = c_k + noise                                     (measure biomarker only)
+```
+
+Key parameters:
+
+| Parameter | Meaning | Default |
 |---|---|---|
-| LOD | 0.24 ng/mL | 0.31 ng/mL |
-| LOQ | 0.80 ng/mL | ~1.0 ng/mL |
-| Linear range | 0.25-5 ng/mL | 0.25-5 ng/mL |
-| Multi-day R2 | 0.997 | 0.994 |
-| Intra-day CV | <6% | <6% |
-| Inter-day CV | <9% | <9% |
-| Spike recovery | 97.3 +/- 2.1% | 97.3 +/- 2.1% |
-| ELISA agreement (ICC) | 0.983 (95% CI: 0.962-0.994) | - |
-| Inter-channel Pearson r | 0.994 | 0.994 |
-| Conjugate stability | 45 days at 37 degrees C | 45 days at 37 degrees C |
-| Assay time | <15 min | <15 min |
+| `A, B, C` | Gompertz shape params (from `GompertzModel.fit`) | 312.4, 4.82, 0.185 |
+| `alpha` | Biomarker shedding rate (ng·mL⁻¹·mm⁻³·day⁻¹) | 0.05 |
+| `beta` | Biomarker serum clearance rate (day⁻¹) | 0.05 |
+| `sigma_obs` | Measurement noise std (ng/mL) | 0.20 |
+| `sigma_proc_V` | Process noise on V (mm³) | 5.0 |
+| `sigma_proc_c` | Process noise on c (ng/mL) | 0.05 |
+| `dt` | Integration sub-step (days) | 1.0 |
 
-Murine DEN-HCC model (n = 10 HCC, n = 10 control; weeks 9-16):
-- GPC3 pooled AUC: 1.00 (95% CI: 0.993-1.000)
-- Tumour volume correlation: Pearson r = 0.981 (R2 = 0.98)
+**`GompertzEKF` methods:**
 
-These values reflect ceiling-level performance in a tightly controlled, single-strain, single-sex, small-sample (n = 10 per group) murine cohort. They are not projections of human diagnostic performance. AUC values from controlled animal models carry a well-documented risk of optimistic bias due to the elimination of inter-individual biological heterogeneity. Prospective human validation across diverse HCC aetiologies is required before clinical deployment.
+| Method | Returns |
+|---|---|
+| `.run(biomarker_obs, t_obs)` | `dict` with `V_est, c_est, V_std, c_std, innovations` |
+| `.cross_validate(obs_matrix, t_obs, V_true)` | `r2, mape, V_pred_all, errors_all` |
+| `.plot(results, tumour_volume_true=None)` | Three-panel figure: V trajectory, biomarker, innovations |
+
+**Porting to a different domain:**
+
+Only three things change — provide new `f` and `h` callables and retune `Q`, `R`:
+
+```python
+# Example: battery state-of-charge estimation
+def f_battery(x, u=None):
+    SoC, R_int = x
+    # discharge model ...
+    return np.array([SoC_next, R_int_next])
+
+def h_battery(x):
+    SoC, R_int = x
+    V_terminal = OCV(SoC) - I_load * R_int
+    return np.array([V_terminal])
+
+ekf = EKF(n_states=2, n_obs=1,
+          Q=np.diag([1e-4, 1e-6]),
+          R=np.array([[1e-3]]),
+          f=f_battery, h=h_battery)
+```
+
+Other direct substitutions: INS navigation `[pos; vel; heading]` + GPS/IMU, SIR epidemiology `[S; I; R]` + reported case counts, robot localisation `[x; y; θ]` + lidar range-bearing.
 
 ---
 
-## Planned Validation Roadmap
+## MATLAB Modules
 
-- Phase 1 (6-12 months): Independent replication in a second BALB/c DEN-HCC cohort (n >=5 per group) at a separate laboratory.
-- Phase 2 (12-18 months): Bridging feasibility study in archived de-identified human serum (n = 30 per group: confirmed HCC, liver cirrhosis without HCC, healthy controls).
-- Phase 3 (24-36 months): Prospective multi-centre clinical validation across viral hepatitis B/C, NAFLD, and alcohol-related liver disease aetiologies.
+### `gompertz_fit.m`
 
-Concurrent platform extensions: smartphone-based RGB image analysis; multiplexed GPC3-AFP-DCP panel on a single chip.
+Fits `V(t) = A·exp(−B·exp(−C·t))` to longitudinal tumour volume data using `lsqcurvefit` (Optimization Toolbox). Compares against linear and exponential alternatives. Bootstrap 95% CIs computed by residual resampling (n = 1000, `rng(2024)`). Produces a three-panel figure: model comparison, residuals, bootstrap distribution of C.
+
+Manuscript values: `A = 312.4 mm³, B = 4.82, C = 0.185 day⁻¹, R² = 0.988, MAPE = 6.3%`.
+
+### `biomarker_statistics.m`
+
+Full statistical pipeline for the murine DEN-HCC cohort (Sections 3.6–3.7):
+
+| Analysis | Function / Method |
+|---|---|
+| ROC + AUC | `perfcurve` + bootstrap DeLong CI |
+| Method agreement | Bland-Altman bias, ±1.96 SD LoA, proportional bias test |
+| Method comparison | Passing-Bablok regression (all pairwise slopes → median) |
+| Reliability | ICC(2,1) two-way mixed, absolute agreement, F-dist 95% CI |
+| Dimensionality | PCA on standardised 5-biomarker panel |
+| Group comparison | One-way ANOVA + Tukey HSD (`anova1`, `multcompare`) |
+| Multiple testing | Benjamini-Hochberg FDR step-up correction (20 tests) |
+
+Input: CSV with columns `[animal_id, group, week, GPC3_chip, GPC3_elisa, AFP, ALT, AST, GGT, tumour_volume]`. Falls back to manuscript summary statistics if no CSV is present.
+
+### `carreau_yasuda_flow.m`
+
+Implements the Carreau-Yasuda viscosity model for whole blood:
+
+```
+η(γ̇) = η_∞ + (η_0 − η_∞) · (1 + (λγ̇)^a)^((n−1)/a)
+
+η_0 = 0.056 Pa·s,  η_∞ = 0.0035 Pa·s,  λ = 3.313 s,  a = 2.0,  n = 0.3568
+```
+
+Integrates the modified Lucas-Washburn equation numerically (Euler, `dt = 0.01 s`) to compute flow-front position vs. time in a 45 mm microchannel. Compares CY vs. Newtonian assumption against experimental data (n = 10 chips). Produces Figure 3: flow-front, parity plot, Bland-Altman, and viscosity profile.
+
+Key outputs: `CY R² = 0.994, RMSE = 7.3%`; `Newtonian R² = 0.871, RMSE = 23.1%`; mean η_eff = 8.9 mPa·s; wall shear stress 0.94 Pa (peak 1.83 Pa, below haemolysis threshold).
+
+### `lspr_rgb_calibration.m`
+
+Fits linear calibration curves for both readout channels over 0.25–5 ng/mL recombinant murine GPC3 (n = 3 replicates × 3 assay days):
+
+```
+LSPR:  A₅₈₀/A₅₂₀ = 0.183 · [GPC3] + 0.312    R² = 0.997   LOD = 0.24 ng/mL
+RGB:   I_red       = −4.54 · [GPC3] + 116.68   R² = 0.994   LOD = 0.31 ng/mL
+
+LOD  =  μ_blank + 3σ_blank   (n = 21 blank replicates, 3 assay days)
+LOQ  =  μ_blank + 10σ_blank
+```
+
+Plots calibration curves with 95% prediction bands (t-distribution, n − 2 df). Computes inter-channel Pearson r from paired calibration fits.
+
+### `surface_dynamics.m`
+
+Computes and visualises surface property changes across three conditions (bare SLA resin → SiNP-only → SiNP-chitosan) from experimentally measured inputs:
+
+- Ra (profilometry), θ (goniometry), ΔP_Laplace = −2γ cos θ / r_h, fibrinogen adsorption (QCM-D), coating thickness (ellipsometry)
+- Produces Figure 4: bar charts, simulated 2D topography maps, and normalised performance heatmap
+
+Model fidelity R² = 0.982 ± 0.009 (n = 18) vs. profilometry.
 
 ---
 
-## Animal Ethics
+## Arduino Firmware
 
-All animal procedures were approved by the Institutional Animal Care and Use Committee (IACUC) of Ain Shams University, Faculty of Science (Approval Code: ASU-SCI/ZOOL/2024/2/4) and conducted in accordance with ARRIVE 2.0 guidelines. Twenty adult male BALB/c mice (6-8 weeks, 20-25 g) were obtained from the Theodor Bilharz Research Institute, Giza, Egypt.
+### `rgb_sensor_readout.ino`
+
+TCS3200 colour sensor readout for instrument-free GPC3 quantification.
+
+**Wiring:**
+
+```
+TCS3200  →  Arduino Nano
+S0       →  D4   (frequency scaling: S0=HIGH, S1=LOW → 20%)
+S1       →  D5
+S2       →  D6   (filter select)
+S3       →  D7
+OUT      →  D8   (pulse-frequency output)
+OE       →  GND  (active low, always enabled)
+```
+
+**Serial output** (9600 baud):
+```
+R:<counts> G:<counts> B:<counts> GPC3_est:<ng/mL>
+```
+
+**Calibration equation applied on-device:**
+```cpp
+const float SLOPE     = -4.54f;   // counts per ng/mL
+const float INTERCEPT = 116.68f;  // counts
+// [GPC3] = (I_red − INTERCEPT) / SLOPE
+```
+
+Readings are averaged over `N_AVERAGE = 5` acquisitions per reported value. Values below `LOD = 0.31 ng/mL` are reported as `<LOD`. Update `SLOPE` and `INTERCEPT` from a daily single-point recalibration against a known standard.
 
 ---
 
-## Data and Design File Availability
+## Dependencies
 
-Raw experimental data, STL fabrication files, and additional fabrication parameters are available from the corresponding author upon reasonable request:
+| Environment | Packages / Toolboxes |
+|---|---|
+| Python ≥ 3.9 | `numpy`, `scipy`, `matplotlib` |
+| MATLAB R2023b | Statistics and ML Toolbox, Optimization Toolbox, Signal Processing Toolbox |
+| Arduino | IDE 2.3.2; board: Arduino Nano (ATmega328P); no external libraries |
 
-Youssef M. Hassan  
-Department of Zoology, Faculty of Science, Ain Shams University, Abbassia 11566, Cairo, Egypt  
-ORCID: 0009-0005-3615-4137  
-Email: yousefmohamed_p@sci.asu.edu.eg
+Install Python dependencies:
+```bash
+pip install numpy scipy matplotlib
+```
+
+---
+
+## Performance
+
+| Metric | Value |
+|---|---|
+| LSPR LOD | 0.24 ng/mL |
+| RGB LOD | 0.31 ng/mL |
+| LSPR multi-day R² | 0.997 |
+| RGB multi-day R² | 0.994 |
+| ELISA agreement (ICC) | 0.983 (95% CI: 0.962–0.994) |
+| Assay time | < 15 min |
+| Gompertz fit R² | 0.988 (MAPE 6.3%) |
+| EKF reconstruction R² | 0.960 (95% CI: 0.931–0.981, LOO-CV) |
+| CY CFD R² | 0.994 (RMSE 7.3%) |
+
+> **Scope note.** All figures reflect a tightly controlled, single-strain, single-sex murine cohort (n = 10/group). The AUC = 1.00 and EKF R² = 0.960 are in-sample retrospective results and are not projections of human clinical performance. Independent validation in a separate cohort is required before any clinical application.
+
+---
+
+## Validation Roadmap
+
+| Phase | Timeline | Milestone |
+|---|---|---|
+| 1 | 6–12 months | Independent replication, second BALB/c DEN-HCC cohort (n ≥ 5/group) |
+| 2 | 12–18 months | Bridging study, archived human serum (n = 30/group: HCC / cirrhosis / healthy) |
+| 3 | 24–36 months | Prospective multi-centre trial (HBV, HCV, NAFLD, ALD aetiologies) |
+
+Concurrent extensions: smartphone RGB image analysis; multiplexed GPC3-AFP-DCP panel on a single chip.
 
 ---
 
 ## Citation
 
-If you use this code or platform design in your work, please cite the associated manuscript (citation details to be updated upon publication).
+Citation details to be updated upon manuscript publication. If you use this code, please cite the associated manuscript (Hassan et al., in preparation).
 
 ---
 
+## Ethics
+
+Animal procedures approved by the IACUC of Ain Shams University, Faculty of Science (Approval Code: ASU-SCI/ZOOL/2024/2/4), conducted in accordance with ARRIVE 2.0 guidelines.
+
 ## Funding
 
-This research received no external funding.
+No external funding received.
 
-## Declaration of Competing Interests
+## Contact
 
-The authors declare no known competing financial interests or personal relationships that could have appeared to influence the work reported.
+**Youssef M. Hassan** — Department of Zoology, Faculty of Science, Ain Shams University, Abbassia 11566, Cairo, Egypt  
+ORCID: [0009-0005-3615-4137](https://orcid.org/0009-0005-3615-4137)  
+Email: yousefmohamed_p@sci.asu.edu.eg
